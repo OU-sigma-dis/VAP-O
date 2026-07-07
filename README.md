@@ -5,7 +5,7 @@ lets a Voice Activity Projection (VAP) model estimate *when* the next speaker wi
 not only *whether* a turn shift is imminent.
 
 > **Onset Proximity: A Regression Target for Predicting When the Next Speaker Will Start in Spoken Dialogue**
-> Kazuyo Onishi, Hien Ohnaka, Koichiro Yoshino. IEEE Access, 2026 (to appear).
+> Kazuyo Onishi, Hien Ohnaka, Koichiro Yoshino. Manuscript in preparation, 2026.
 
 The label rises linearly toward each speaker's next speech onset and peaks at the onset,
 so onset timing can be read out by peak detection. VAP-O keeps the standard channel-separated
@@ -99,12 +99,14 @@ accesses the true onset and reports precision, recall, false-alarm rate, and ear
 
 ## Citation
 
+A citation will be added once the paper is published. The manuscript is currently in preparation.
+
 ```bibtex
-@article{onishi2026onset,
-  title   = {Onset Proximity: A Regression Target for Predicting When the Next Speaker Will Start in Spoken Dialogue},
-  author  = {Onishi, Kazuyo and Ohnaka, Hien and Yoshino, Koichiro},
-  journal = {IEEE Access},
-  year    = {2026}
+@unpublished{onishi2026onset,
+  title  = {Onset Proximity: A Regression Target for Predicting When the Next Speaker Will Start in Spoken Dialogue},
+  author = {Onishi, Kazuyo and Ohnaka, Hien and Yoshino, Koichiro},
+  note   = {Manuscript in preparation},
+  year   = {2026}
 }
 ```
 
