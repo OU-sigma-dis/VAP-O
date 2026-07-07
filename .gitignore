@@ -1,0 +1,73 @@
+# ============================================================
+# VAP-O .gitignore
+# 公開しないもの: 大容量の成果物・生成物・内部メモ・重み・データ・環境
+# ============================================================
+
+# --- Python 環境・キャッシュ ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+build/
+dist/
+
+# --- 学習成果物・チェックポイント（大容量） ---
+output/
+lightning_logs/
+logs/
+wandb/
+*.ckpt
+*.pt
+*.pth
+
+# 事前学習 CPC 重み（別途取得。ライセンスの都合で同梱しない）
+models/pre_trained_model.pt
+models/pre_trained_model_lightning_checkpoint.ckpt
+assets/checkpoints/
+
+# --- 生成物・キャッシュ・評価出力 ---
+runs_evaluation/
+reports/
+*.pkl
+*.npy
+scripts/latency_results*.json
+
+# --- 内部メモ・レポート（公開しない） ---
+docs/report*.pdf
+docs/report*.md
+docs/TRAINING_ISSUES_REPORT.md
+docs/assets/
+
+# --- データ（Switchboard 等はライセンスにより同梱不可） ---
+data/
+*.wav
+*.csv
+
+# --- エディタ・OS ---
+.vscode/
+.claude/
+.DS_Store
+*.swp
+package-lock.json
+
+# --- 公開しない補助/探索/旧スクリプト（ローカルには保持, 再現に不要） ---
+diagnostic.py
+docs/header.tex
+docs/style.css
+scripts/analyze_filler_turn_speed.py
+scripts/replot_filler_figs.py
+scripts/tier1_stats.py
+scripts/tier1c_baseline_ci.py
+scripts/tier1d_effectsize.py
+scripts/detection_improve.py
+scripts/eval_method_sweep.py
+scripts/vap_bin_resolution.py
+scripts/timing_baselines.py
+scripts/vap_onset_baseline.py
+scripts/visualize_predictions.py
+scripts/run_causal_reexperiment.sh
+trains/eval_turn_shift_gamma.py
+trains/plot_turn_shift_dist.py
+trains/evaluation_baseline.py
