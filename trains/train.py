@@ -61,6 +61,12 @@ def get_args():
         help="Device to use for training (auto/cuda/cpu/mps)",
     )
     parser.add_argument("--devices", type=str, default="0")
+    parser.add_argument(
+        "--init_ckpt",
+        type=str,
+        default="",
+        help="ファインチューニング用: 学習開始前にロードする既存チェックポイント",
+    )
     args = parser.parse_args()
 
     model_conf = VapConfig.args_to_conf(args)
@@ -109,6 +115,14 @@ def train() -> None:
     model = VAPModel(
         configs["model"], opt_conf=configs["opt"], event_conf=configs["event"]
     )
+
+    # ファインチューニング: 既存チェックポイントの重みで初期化（構成は CLI 指定を優先）
+    if cfg_dict.get("init_ckpt"):
+        state = torch.load(cfg_dict["init_ckpt"], map_location="cpu",
+                           weights_only=False)["state_dict"]
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        logger.info(f"init_ckpt をロード: {cfg_dict['init_ckpt']} "
+                    f"(missing={len(missing)}, unexpected={len(unexpected)})")
 
     name = get_run_name(configs)
 
@@ -628,6 +642,15 @@ class VAPModel(VapGPT, pl.LightningModule):
             out: dict, model出力 + 'onset_loss', 'vad_loss', 'filler_loss'
         """
         n_frames = batch["onset_proximity"].shape[1]
+        # 片チャネル入力実験: 指定チャネルの音声と CPC 特徴を入力からゼロ化する
+        # （ターゲットは両話者のまま。片方の音声だけで相手の onset を予測できるかを見る）
+        zc = getattr(self.conf, "zero_channel", -1)
+        if zc in (0, 1):
+            batch["waveform"] = batch["waveform"].clone()
+            batch["waveform"][:, zc] = 0.0
+            feat_key = f"cpc_feat_{zc + 1}"
+            if batch.get(feat_key) is not None:
+                batch[feat_key] = torch.zeros_like(batch[feat_key])
         out = self(
             audio=batch["waveform"],
             text_tokens=batch["text_tokens"],
@@ -656,10 +679,26 @@ class VAPModel(VapGPT, pl.LightningModule):
         speaker_diff = (target_onset[:, :, 0:1] - target_onset[:, :, 1:2]).abs()  # (B, T, 1)
 
         onset_weight = torch.ones_like(target_onset)
-        onset_weight = torch.where(target_onset > 0, 2.0, onset_weight)
-        onset_weight = onset_weight + 3.0 * silence.expand_as(onset_weight)
-        onset_weight = onset_weight + 2.0 * speaker_diff.expand_as(onset_weight)
-        onset_loss = (onset_weight * (pred_onset - target_onset) ** 2).mean()
+        # アブレーション: use_onset_weight=False で重み無し MSE に退化させる
+        if getattr(self.conf, "use_onset_weight", True):
+            onset_weight = torch.where(target_onset > 0, 2.0, onset_weight)
+            onset_weight = onset_weight + 3.0 * silence.expand_as(onset_weight)
+            onset_weight = onset_weight + 2.0 * speaker_diff.expand_as(onset_weight)
+        hz_bins = getattr(self.conf, "onset_hazard_bins", 0)
+        if hz_bins > 0:
+            # hazard 型: 線形ラベル op=max(0,1-d/H) から累積指示 y_k=1[d<=k·H/K] を
+            # 厳密に導出（op>=1-k/K かつ op>0 ⇔ d<=k·H/K かつ d<H）して BCE。
+            # 補助損失（contrast/diff）は op 等価信号 pred_onset にそのまま適用される
+            hz = out["onset_hazard"][:, :t_min]
+            thr = 1.0 - torch.arange(
+                1, hz_bins + 1, device=hz.device, dtype=hz.dtype
+            ) / hz_bins
+            tgt = target_onset.unsqueeze(-1)
+            y_hz = ((tgt >= thr) & (tgt > 0)).to(hz.dtype)
+            bce = torch.nn.functional.binary_cross_entropy(hz, y_hz, reduction="none")
+            onset_loss = (onset_weight.unsqueeze(-1) * bce).mean()
+        else:
+            onset_loss = (onset_weight * (pred_onset - target_onset) ** 2).mean()
 
         # VAD損失: BCE(pred_vad, target_va)
         vad_loss = torch.nn.functional.binary_cross_entropy_with_logits(
@@ -667,12 +706,19 @@ class VAPModel(VapGPT, pl.LightningModule):
         )
 
         # フィラー分類損失: クラス重み付きCrossEntropy
-        filler_loss = torch.nn.functional.cross_entropy(
-            out["filler_logits"][:, :t_min].reshape(-1, self.conf.num_filler_classes),
-            batch["next_filler_class"][:, :t_min].reshape(-1),
-            ignore_index=0,  # PAD(=0)を無視
-            weight=self._get_filler_class_weights(out["filler_logits"].device),
-        )
+        # フィラー注釈の無いコーパス（例: JaNoXi）では全フレームが PAD(=0) となり、
+        # 有効ターゲットが 0 個で cross_entropy が nan を返す。0.0 係数でも 0*nan=nan で
+        # 総損失が汚染されるため、有効ターゲットが無い場合は 0 に落とす。
+        filler_targets = batch["next_filler_class"][:, :t_min].reshape(-1)
+        if (filler_targets != 0).any():
+            filler_loss = torch.nn.functional.cross_entropy(
+                out["filler_logits"][:, :t_min].reshape(-1, self.conf.num_filler_classes),
+                filler_targets,
+                ignore_index=0,  # PAD(=0)を無視
+                weight=self._get_filler_class_weights(out["filler_logits"].device),
+            )
+        else:
+            filler_loss = torch.zeros((), device=out["filler_logits"].device)
 
         # 話者間コントラスト損失:
         # GT で話者間の差が大きいフレームで、pred にも差を要求する
@@ -759,7 +805,11 @@ class VAPModel(VapGPT, pl.LightningModule):
             sync_dist=True,
         )
         filler_coef = 0.1 if getattr(self.conf, "use_filler", True) else 0.0
-        loss = out["onset_loss"] + out["contrast_loss"] + out["diff_loss"] + out["vad_loss"] + filler_coef * out["filler_loss"]
+        # アブレーション: 各補助損失の係数をフラグで 0/1 に切り替える
+        c_coef = 1.0 if getattr(self.conf, "use_contrast_loss", True) else 0.0
+        d_coef = 1.0 if getattr(self.conf, "use_diff_loss", True) else 0.0
+        v_coef = 1.0 if getattr(self.conf, "use_vad_loss", True) else 0.0
+        loss = out["onset_loss"] + c_coef * out["contrast_loss"] + d_coef * out["diff_loss"] + v_coef * out["vad_loss"] + filler_coef * out["filler_loss"]
 
         # Log batch loss
         self.log(
@@ -856,9 +906,12 @@ class VAPModel(VapGPT, pl.LightningModule):
             sync_dist=True,
         )
 
-        # 合計
+        # 合計（学習時と同じアブレーション係数で val_total を算出）
         _fc = 0.1 if getattr(self.conf, "use_filler", True) else 0.0
-        val_total = out["onset_loss"] + out["contrast_loss"] + out["diff_loss"] + out["vad_loss"] + _fc * out["filler_loss"]
+        _cc = 1.0 if getattr(self.conf, "use_contrast_loss", True) else 0.0
+        _dc = 1.0 if getattr(self.conf, "use_diff_loss", True) else 0.0
+        _vc = 1.0 if getattr(self.conf, "use_vad_loss", True) else 0.0
+        val_total = out["onset_loss"] + _cc * out["contrast_loss"] + _dc * out["diff_loss"] + _vc * out["vad_loss"] + _fc * out["filler_loss"]
         self.log(
             "val_loss_total",
             val_total,

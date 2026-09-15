@@ -39,6 +39,19 @@ class VapConfig:
     # Onset Proximity
     onset_horizon: float = 3.0  # onset proximity の正規化基準（秒）
 
+    # --- アブレーション用フラグ（既定値は本手法 Full VAP-O。学習時のみ影響）---
+    onset_ramp: str = "linear"  # ラベルの立ち上がり形状: linear / convex / exp
+    # >0: hazard 型ターゲット。K 個の累積 onset 指示 y_k=1[d<=k·H/K] を BCE で学習し、
+    # 生存関数の期待値から op 等価信号を導出して onset_proximity として返す
+    onset_hazard_bins: int = 0
+    # 片チャネル入力実験: 0/1 でそのチャネルの音声・CPC 特徴をゼロにして学習する
+    # （例: zero_channel=1 → ch0 の音声のみから両話者の onset proximity を予測）
+    zero_channel: int = -1
+    use_onset_weight: bool = True   # False: 重み無し MSE（unweighted MSE アブレーション）
+    use_contrast_loss: bool = True  # False: L_contrast を損失から外す
+    use_diff_loss: bool = True      # False: L_diff（時間微分整合）を外す
+    use_vad_loss: bool = True       # False: 補助 VAD ヘッドを損失から外す
+
     # Filler Classification
     num_filler_classes: int = 8
     use_filler: bool = True  # False: フィラー予測を損失から外す（補助ヘッド無効化）

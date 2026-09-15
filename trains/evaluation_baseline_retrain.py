@@ -29,17 +29,6 @@ from sklearn.metrics import (
 from torch import Tensor
 from tqdm import tqdm
 
-# MaAI
-sys.path.insert(0, "/Users/onishi/MaAI/train")
-sys.path.insert(0, "/Users/onishi/MaAI/src")
-import types
-maai_fake = types.ModuleType("maai")
-maai_fake.__path__ = ["/Users/onishi/MaAI/src/maai"]
-maai_fake.__package__ = "maai"
-sys.modules["maai"] = maai_fake
-
-from objective import ObjectiveVAP
-
 # VAP-O
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import EventConfig
@@ -48,6 +37,7 @@ from utilities.utils import everything_deterministic
 
 # 再学習ベースラインモデル
 from train_baseline import BaselineVAPModel
+from objective import ObjectiveVAP
 
 everything_deterministic()
 

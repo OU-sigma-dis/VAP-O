@@ -5,7 +5,11 @@
 
 # --- Python 環境・キャッシュ ---
 .venv/
+.venv*/
 venv/
+.env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -30,6 +34,7 @@ assets/checkpoints/
 # --- 生成物・キャッシュ・評価出力 ---
 runs_evaluation/
 reports/
+output_debug/
 *.pkl
 *.npy
 scripts/latency_results*.json
@@ -71,3 +76,32 @@ scripts/run_causal_reexperiment.sh
 trains/eval_turn_shift_gamma.py
 trains/plot_turn_shift_dist.py
 trains/evaluation_baseline.py
+
+# Local analyses that are not part of the archival release
+docs/onset_proximity_illustration_yans.py
+scripts/ablation_eval.py
+scripts/cache_baseline_logits.py
+scripts/check_openai_key.py
+scripts/export_timing_events.py
+scripts/janoxi_eval.py
+scripts/llm_gap_baseline.py
+scripts/make_highlight_v6.py
+scripts/make_label_variants.py
+scripts/make_speaker_disjoint_split.py
+scripts/make_ttso_variants.py
+scripts/modern_systems_table.py
+scripts/moshi_timing.py
+scripts/pick_overlap_fig.py
+scripts/prepare_janoxi.py
+scripts/readout_ablation.py
+scripts/realtime_probe.py
+scripts/realtime_timing.py
+scripts/session_stats.py
+scripts/single_channel_eval.py
+scripts/speaker_disjoint_eval.py
+scripts/speaker_overlap_analysis.py
+scripts/target_family_eval.py
+scripts/train_logits_decoder.py
+scripts/visualize_predictions_simple_yans.py
+scripts/visualize_streaming.py
+scripts/visualize_streaming_paperstyle.py

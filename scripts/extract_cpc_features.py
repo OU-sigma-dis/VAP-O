@@ -14,10 +14,10 @@
 
 使い方:
   python scripts/extract_cpc_features.py \
-    --csv_paths /Users/onishi/data/switchboard/vap-o_dataset/train.csv \
-                /Users/onishi/data/switchboard/vap-o_dataset/val.csv \
-                /Users/onishi/data/switchboard/vap-o_dataset/test.csv \
-    --output_dir /Users/onishi/data/switchboard/vap-o_dataset/cpc_features \
+    --csv_paths /path/to/vap-o_dataset/train.csv \
+                /path/to/vap-o_dataset/val.csv \
+                /path/to/vap-o_dataset/test.csv \
+    --output_dir /path/to/vap-o_dataset/cpc_features \
     --chunk_sec 60
 """
 

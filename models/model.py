@@ -99,7 +99,11 @@ class VapGPT(nn.Module):
 
         # --- Output Heads ---
         self.va_head = nn.Linear(conf.dim, 2, bias=False)
-        self.onset_proximity_head = nn.Linear(conf.dim, 2, bias=False)
+        # hazard 型（onset_hazard_bins>0）では話者ごとに K 個の累積指示を出力する
+        _hz_bins = getattr(conf, "onset_hazard_bins", 0)
+        self.onset_proximity_head = nn.Linear(
+            conf.dim, 2 * _hz_bins if _hz_bins > 0 else 2, bias=False
+        )
         self.filler_dropout = nn.Dropout(0.3)
         self.filler_head = nn.Linear(conf.dim, conf.num_filler_classes, bias=False)
 
@@ -326,14 +330,25 @@ class VapGPT(nn.Module):
 
         # 6. 各ヘッドで予測する
         vad = self.va_head(fused)
-        onset_proximity = torch.sigmoid(self.onset_proximity_head(fused))
         filler_logits = self.filler_head(self.filler_dropout(fused))
 
-        return {
-            "vad": vad,
-            "onset_proximity": onset_proximity,
-            "filler_logits": filler_logits,
-        }
+        _hz_bins = getattr(self.conf, "onset_hazard_bins", 0)
+        out = {"vad": vad, "filler_logits": filler_logits}
+        if _hz_bins > 0:
+            # hazard 型: 累積確率 p_k=P(d<=k·H/K)。生存関数の総和が E[min(d,H)] を与え、
+            # そこから op 等価信号を導出して下流の読み出し・評価を無変更で使えるようにする
+            hz = torch.sigmoid(self.onset_proximity_head(fused)).view(
+                fused.shape[0], fused.shape[1], 2, _hz_bins
+            )
+            delta = self.conf.onset_horizon / _hz_bins
+            expected_d = delta * (1.0 - hz).sum(dim=-1)
+            out["onset_hazard"] = hz
+            out["onset_proximity"] = (
+                1.0 - expected_d / self.conf.onset_horizon
+            ).clamp(0.0, 1.0)
+        else:
+            out["onset_proximity"] = torch.sigmoid(self.onset_proximity_head(fused))
+        return out
 
 
 if __name__ == "__main__":

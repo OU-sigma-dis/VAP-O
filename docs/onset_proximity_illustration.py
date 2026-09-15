@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
+from pathlib import Path
 
 # 日本語表示のため、macOS標準の Hiragino を登録
 _jp = "/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc"
@@ -128,6 +129,6 @@ for ax in axes:
     ax.spines[["top", "right"]].set_visible(False)
 
 fig.suptitle("Onset Proximity の直感的イメージ", fontsize=14, fontweight="bold", x=0.5)
-fig.savefig("/Users/onishi/VAP-O/docs/onset_proximity_illustration.png",
-            dpi=150, bbox_inches="tight")
-print("saved")
+output_path = Path(__file__).with_name("onset_proximity_illustration.png")
+fig.savefig(output_path, dpi=150, bbox_inches="tight")
+print(f"saved: {output_path}")

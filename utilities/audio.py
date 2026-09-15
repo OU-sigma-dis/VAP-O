@@ -99,8 +99,11 @@ def log_mel_spectrogram(
 
 
 if __name__ == "__main__":
-    path = "/Users/onishi/data/test.wav"
-    x, sr = load_waveform(path)
+    from argparse import ArgumentParser
 
-    info = get_audio_info(path)
-    print(info)
+    parser = ArgumentParser(description="Inspect an audio file.")
+    parser.add_argument("path")
+    args = parser.parse_args()
+    waveform, sample_rate = load_waveform(args.path)
+    print(get_audio_info(args.path))
+    print({"waveform_shape": tuple(waveform.shape), "sample_rate": sample_rate})

@@ -35,12 +35,11 @@ from train_baseline import BaselineVAPModel
 from objective import ObjectiveVAP
 from vap.events import TurnTakingEvents
 from model import VapConfig as MaaiVapConfig
+from utilities.paths import switchboard_paths
 
 FRAME_HZ = 20
 TOLS = [0.1, 0.3, 0.5, 1.0]
-TEST_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/test.csv"
-VAL_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/val.csv"
-CPC_DIR = "/Users/onishi/data/switchboard/vap-o_dataset/cpc_features"
+_, VAL_CSV, TEST_CSV, CPC_DIR = switchboard_paths()
 VAPO_CKPT = "output/checkpoints_stereo_onset/VapGPT_20Hz_cpc_glove100gru_d256-epoch28-onset_0.28265.ckpt"
 BASEB_CKPT = "output/checkpoints_baseline_retrain/baseline_retrain-epoch16-val_2.52317.ckpt"
 

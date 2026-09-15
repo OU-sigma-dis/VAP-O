@@ -8,7 +8,9 @@ onset_proximity は CSV の vad_list から再計算する。
 """
 
 import json
+import os
 import sys
+from argparse import ArgumentParser
 from pathlib import Path
 
 import pandas as pd
@@ -58,15 +60,14 @@ def compute_onset_proximity(vad_list, n_frames):
 
 
 def main():
-    # プロジェクトルートに移動
-    import os
-    os.chdir(Path(__file__).resolve().parent.parent)
-
-    csv_paths = [
-        "/Users/onishi/data/switchboard/vap-o_dataset/train.csv",
-        "/Users/onishi/data/switchboard/vap-o_dataset/val.csv",
-        "/Users/onishi/data/switchboard/vap-o_dataset/test.csv",
-    ]
+    parser = ArgumentParser(description="Regenerate onset-proximity labels in-place.")
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=Path(os.environ.get("VAPO_DATA_ROOT", "../data/switchboard/vap-o_dataset")),
+    )
+    args = parser.parse_args()
+    csv_paths = [args.data_root / f"{split}.csv" for split in ("train", "val", "test")]
 
     # 絶対パスに変換
     csv_paths = [str(Path(p).resolve()) for p in csv_paths]

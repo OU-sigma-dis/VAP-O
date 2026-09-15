@@ -39,11 +39,10 @@ from model import VapConfig as MaaiVapConfig
 from tier1b_paired import run_models, localize_argmax, localize_firstpeak
 from final_stats import (agg, wf1, best_thr, timing_summary, vo_errors, AGG_CANDS,
                          onset_errors, FRAME_HZ, TOLS)
+from utilities.paths import switchboard_paths
 
 SEED = 42
-VAL_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/val.csv"
-TEST_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/test.csv"
-CPC_DIR = "/Users/onishi/data/switchboard/vap-o_dataset/cpc_features"
+_, VAL_CSV, TEST_CSV, CPC_DIR = switchboard_paths()
 METRIC_KEYS = ["hs", "pred_shift", "pred_shift_ov", "bc"]
 
 import glob

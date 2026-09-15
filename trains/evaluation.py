@@ -7,7 +7,7 @@
   4. フィラーTop-K正解率、S値許容範囲別正解率も算出
 
 使い方:
-  cd /Users/onishi/VAP-O/trains
+  cd trains
   python evaluation.py --checkpoint <path_to_ckpt>
   python evaluation.py --checkpoint output/checkpoints/  # ディレクトリ指定で最良ckpt自動選択
 """

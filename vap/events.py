@@ -344,32 +344,27 @@ def backchannel_regions(
             # MINIMAL CONTEXT CONDITION
             ################################################
             if start_of[bc] < min_context_frames:
-                # print("Minimal context")
                 continue
             ################################################
             # MAXIMAL FRAME CONDITION
             ################################################
             if start_of[bc] >= max_frame:
-                # print("Max frame")
                 continue
             ################################################
             # MINIMAL DURATION CONDITION
             ################################################
             # Check bc duration
             if duration_of[bc] > max_bc_frames:
-                # print("Too Long")
                 continue
             ################################################
             # PRE CONDITION: No previous activity from bc-speaker
             ################################################
             if duration_of[pre_silence] < pre_cond_frames:
-                # print('not enough silence PRIOR to "bc"')
                 continue
             ################################################
             # POST CONDITION: No post activity from bc-speaker
             ################################################
             if duration_of[post_silence] < post_cond_frames:
-                # print('not enough silence POST to "bc"')
                 continue
             ################################################
             # ALL CONDITIONS MET

@@ -37,13 +37,12 @@ from vap.events import TurnTakingEvents
 from model import VapConfig as MaaiVapConfig
 from tier1b_paired import localize_argmax, localize_firstpeak, moving_average
 from vap_timing_readouts import predict_event, crossing_in_region, BIN_CENTERS
+from utilities.paths import switchboard_paths
 
 FRAME_HZ = 20
 TOLS = [0.1, 0.3, 0.5, 1.0]
 SEED_NEG = 42  # 負例サンプリング固定（イベント集合を全 seed で共通化）
-VAL_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/val.csv"
-TEST_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/test.csv"
-CPC_DIR = "/Users/onishi/data/switchboard/vap-o_dataset/cpc_features"
+_, VAL_CSV, TEST_CSV, CPC_DIR = switchboard_paths()
 
 SEEDS = {
     "42": ("output/checkpoints_stereo_onset_seed42/*onset_*.ckpt",

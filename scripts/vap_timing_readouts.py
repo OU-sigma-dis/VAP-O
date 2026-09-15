@@ -47,14 +47,13 @@ from train_baseline import BaselineVAPModel
 from vap.events import TurnTakingEvents
 from model import VapConfig as MaaiVapConfig
 from tier1b_paired import BASEB_CKPT, moving_average, localize_argmax
+from utilities.paths import switchboard_paths
 
 FRAME_HZ = 20
 TOLS = [0.1, 0.3, 0.5, 1.0]
 SEED = 42
 BIN_CENTERS = np.array([0.1, 0.4, 0.9, 1.6])  # bin 境界 [0,.2,.6,1.2,2.0] の中心
-VAL_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/val.csv"
-TEST_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/test.csv"
-CPC_DIR = "/Users/onishi/data/switchboard/vap-o_dataset/cpc_features"
+_, VAL_CSV, TEST_CSV, CPC_DIR = switchboard_paths()
 CACHE = Path("reports/_vapreadout_cache.pkl")
 FINAL_CACHE = Path("reports/_final_cache.pkl")
 

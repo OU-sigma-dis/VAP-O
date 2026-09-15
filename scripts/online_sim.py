@@ -50,6 +50,7 @@ from train_baseline import BaselineVAPModel
 from vap.events import TurnTakingEvents
 from model import VapConfig as MaaiVapConfig
 from tier1b_paired import VAPO_CKPT, BASEB_CKPT
+from utilities.paths import switchboard_paths
 
 FRAME_HZ = 20
 H_FRAMES = 60            # H=3.0s
@@ -61,9 +62,7 @@ MAJOR_SIL = 10           # 主要 onset の先行沈黙 0.5s
 G_FRAMES = 11            # 固定ギャップ 0.55s（val 中央値）
 TOLS = [0.1, 0.3, 0.5, 1.0]
 SEED = 42
-VAL_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/val.csv"
-TEST_CSV = "/Users/onishi/data/switchboard/vap-o_dataset/test.csv"
-CPC_DIR = "/Users/onishi/data/switchboard/vap-o_dataset/cpc_features"
+_, VAL_CSV, TEST_CSV, CPC_DIR = switchboard_paths()
 CACHE = Path("reports/_online_cache.pkl")
 
 

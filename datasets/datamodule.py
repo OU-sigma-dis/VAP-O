@@ -123,10 +123,12 @@ class VapDataModule(pl.LightningDataModule):
         )
 
     def val_dataloader(self):
+        # 全 val データで評価する。drop_last=True だと小規模 val（例: JaNoXi の
+        # 単一セッション 58 窓 < batch_size）で全バッチが落ち検証自体が無効化される。
         return DataLoader(
             self.val_dset,
             shuffle=False,
-            drop_last=True,
+            drop_last=False,
             collate_fn=collate_fn_float32,
             **self.dataloader_kwargs,
         )
@@ -135,7 +137,7 @@ class VapDataModule(pl.LightningDataModule):
         return DataLoader(
             self.test_dset,
             shuffle=False,
-            drop_last=True,
+            drop_last=False,
             collate_fn=collate_fn_float32,
             **self.dataloader_kwargs,
         )

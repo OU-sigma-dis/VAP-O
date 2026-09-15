@@ -10,6 +10,7 @@ Output: onset_proximity_illustration_en.png
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 matplotlib.rcParams["font.family"] = "DejaVu Sans"
 matplotlib.rcParams["axes.unicode_minus"] = False
@@ -136,6 +137,6 @@ for ax in axes:
     ax.set_xlim(-0.05, T)
     ax.spines[["top", "right"]].set_visible(False)
 
-fig.savefig("/Users/onishi/VAP-O/docs/onset_proximity_illustration_en.png",
-            dpi=150, bbox_inches="tight")
-print("saved")
+output_path = Path(__file__).with_name("onset_proximity_illustration_en.png")
+fig.savefig(output_path, dpi=150, bbox_inches="tight")
+print(f"saved: {output_path}")

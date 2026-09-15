@@ -190,7 +190,6 @@ class EncoderCPC(nn.Module):
                             z[b, i + j, :] = (
                                 z_[idx_copied, -1, :].to("cpu").detach().numpy().copy()
                             )
-                            # print(idx_copied)
                             idx_copied += 1
 
                     del z_, waveform_, w_

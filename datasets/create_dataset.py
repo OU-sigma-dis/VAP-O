@@ -1,5 +1,6 @@
 import csv
 import glob
+import os
 import random
 from pathlib import Path
 
@@ -18,6 +19,27 @@ OUTPUT_DIR = Path.home() / "data/switchboard/vap-o_dataset"
 SAMPLE_RATE = 16000
 FRAME_HZ = 20
 SEED = 42
+
+# --- Onset Proximity ラベル生成の設定（アブレーション用に環境変数で上書き可）---
+# 既定は本手法（H=3.0秒, linear ramp）。データ再生成時のみ効く。
+ONSET_HORIZON = float(os.environ.get("VAPO_ONSET_HORIZON", "3.0"))
+ONSET_RAMP = os.environ.get("VAPO_ONSET_RAMP", "linear")  # linear / convex / exp
+
+
+def _onset_ramp(r: float) -> float:
+    """正規化近接度 r=1-dist/H を立ち上がり形状へ写像する。
+
+    入力: r (0=horizon端, 1=onset)。出力: ラベル値 [0,1]。
+    linear=r, convex=r^2（onset直前で急峻）, exp=(e^r-1)/(e-1)（滑らかな加速）。
+    いずれも r=0→0, r=1→1 を満たし peak は onset に一致する。
+    """
+    if r <= 0.0:
+        return 0.0
+    if ONSET_RAMP == "convex":
+        return r * r
+    if ONSET_RAMP == "exp":
+        return (2.718281828459045 ** r - 1.0) / (2.718281828459045 - 1.0)
+    return r  # linear（既定）
 
 NON_SPEECH_MARKERS = [
     "[silence]",
@@ -152,9 +174,8 @@ def generate_frame_labels(vad_a, vad_b, words_all, duration):
         va[s:e, 1] = 1.0
 
     # --- Onset Proximity: 各話者の次のonsetまでの近さ ---
-    # onset_proximity[t, speaker] = max(0, 1 - distance_to_next_onset(t) / horizon)
-    # horizon=3.0秒。reverse scanで効率的に計算。
-    ONSET_HORIZON = 3.0
+    # onset_proximity[t, speaker] = ramp(max(0, 1 - distance_to_next_onset(t) / horizon))
+    # 既定 horizon=3.0秒 / linear ramp。reverse scanで効率的に計算。
     horizon_frames = int(ONSET_HORIZON * FRAME_HZ)
     onset_proximity = torch.zeros(n_frames, 2)
 
@@ -169,7 +190,7 @@ def generate_frame_labels(vad_a, vad_b, words_all, duration):
         for t in range(n_frames - 1, -1, -1):
             if t in onsets:
                 dist = 0
-            onset_proximity[t, speaker] = max(0.0, 1.0 - dist / horizon_frames)
+            onset_proximity[t, speaker] = _onset_ramp(1.0 - dist / horizon_frames)
             dist += 1
 
     # --- next_word: 各フレームから次に始まる発話単語 ---

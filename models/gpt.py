@@ -213,8 +213,6 @@ class MultiHeadAttentionAlibi(MultiHeadAttention):
                 self.mask = mask
             else:
                 mask = self.mask[..., :T, :T]
-            # print(mask)
-            # print("mask: ", tuple(mask.shape))
 
         # add aLiBi-mask to qk (see Figure 3.)
         # Addition/translation does not effect softmax (over each row)

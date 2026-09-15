@@ -22,14 +22,21 @@ from loguru import logger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
 from pytorch_lightning.loggers import CSVLogger
 
-# MaAI のモジュールを使用
-sys.path.insert(0, "/Users/onishi/MaAI/train")
-sys.path.insert(0, "/Users/onishi/MaAI/src")
+# MaAI の参照実装を使用する。公開リポジトリにはコピーしないため、利用者が
+# VAPO_MAAI_ROOT に MaAI checkout のルートを指定する。
+_ROOT = Path(__file__).resolve().parent.parent
+_maai_root = Path(os.environ.get("VAPO_MAAI_ROOT", "")).expanduser()
+if not (_maai_root / "train" / "model.py").is_file() or not (_maai_root / "src" / "maai").is_dir():
+    raise RuntimeError(
+        "Set VAPO_MAAI_ROOT to a MaAI checkout containing train/model.py and src/maai/."
+    )
+sys.path.insert(0, str(_maai_root / "train"))
+sys.path.insert(0, str(_maai_root / "src"))
 
-# pyaudio 依存を回避
+# The reference package imports optional audio dependencies that are not needed here.
 import types
 maai_fake = types.ModuleType("maai")
-maai_fake.__path__ = ["/Users/onishi/MaAI/src/maai"]
+maai_fake.__path__ = [str(_maai_root / "src" / "maai")]
 maai_fake.__package__ = "maai"
 sys.modules["maai"] = maai_fake
 
@@ -37,7 +44,7 @@ from model import VapGPT as BaselineVapGPT, VapConfig as BaselineVapConfig
 from objective import ObjectiveVAP
 
 # VAP-O のデータパイプライン
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(_ROOT))
 from datasets.datamodule import VapDataModule
 
 warnings.filterwarnings("ignore", message=".*litmodels.*")
@@ -56,7 +63,9 @@ class BaselineVAPModel(BaselineVapGPT, pl.LightningModule):
             conf = BaselineVapConfig(
                 frame_hz=20,
                 bin_times=[0.2, 0.4, 0.6, 0.8],
-                cpc_model_pt="/Users/onishi/VAP-O/assets/checkpoints/cpc/60k_epoch4-d0f474de.pt",
+                cpc_model_pt=os.environ.get(
+                    "VAPO_CPC_CHECKPOINT", "assets/checkpoints/cpc/60k_epoch4-d0f474de.pt"
+                ),
                 freeze_encoder=1,
                 load_pretrained=1,
                 channel_layers=1,
@@ -185,7 +194,8 @@ class BaselineVAPModel(BaselineVapGPT, pl.LightningModule):
         )
 
 
-def train(seed: int = 42, save_dir: str | None = None):
+def train(seed: int = 42, save_dir: str | None = None,
+          train_csv: str | None = None, val_csv: str | None = None):
     # 複数 seed 検証（査読対応）: seed は学習の乱数（重み初期化・シャッフル等）のみを
     # 変える。データ分割は CSV で固定済みであり seed に依存しない。
     pl.seed_everything(seed)
@@ -205,8 +215,8 @@ def train(seed: int = 42, save_dir: str | None = None):
     NUM_WORKERS = 16
 
     # パス
-    TRAIN_PATH = "../data/switchboard/vap-o_dataset/train.csv"
-    VAL_PATH = "../data/switchboard/vap-o_dataset/val.csv"
+    TRAIN_PATH = train_csv or "../data/switchboard/vap-o_dataset/train.csv"
+    VAL_PATH = val_csv or "../data/switchboard/vap-o_dataset/val.csv"
     SAVE_DIR = save_dir or "./output/checkpoints_baseline_retrain"
     LOG_DIR = "./output/logs"
 
@@ -330,5 +340,8 @@ if __name__ == "__main__":
     ap = ArgumentParser()
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--save_dir", type=str, default=None)
+    ap.add_argument("--train_csv", type=str, default=None)
+    ap.add_argument("--val_csv", type=str, default=None)
     args = ap.parse_args()
-    train(seed=args.seed, save_dir=args.save_dir)
+    train(seed=args.seed, save_dir=args.save_dir,
+          train_csv=args.train_csv, val_csv=args.val_csv)

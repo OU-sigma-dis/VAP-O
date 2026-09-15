@@ -25,8 +25,10 @@ from config.training import OptConfig, DataConfig
 from datasets.dataset import VapDataset
 from trains.train import VAPModel
 from vap.events import TurnTakingEvents
+from utilities.paths import switchboard_paths
 
 FRAME_HZ = 20
+_, _, TEST_CSV, CPC_DIR = switchboard_paths()
 
 # フォント・線の既定値を大きめに
 plt.rcParams.update({
@@ -58,14 +60,19 @@ def find_peak_after(signal, start, end):
 
 
 def plot_shift(ax, pred_onset, gt_onset, va, speaker, sil_start, onset_start,
-               ps_start, ps_end, threshold, window_pad=40, ma=1):
+               ps_start, ps_end, threshold, window_pad=40, ma=1,
+               band_end=None, band_label="silence", band_color="orange",
+               band_alpha=0.22, draw_marker=True, show_error=True):
     """1 つの shift イベントを単一パネルで描く（次話者のみ、予測は MA 平滑化）。
-    背景に各話者の発話区間を薄く塗る。"""
+    背景に各話者の発話区間を薄く塗る。band_* で沈黙帯/オーバーラップ帯を切替。
+    draw_marker=False で予測onsetマーカーを省略（オーバーラップは局在化採点をしないため）。"""
     n_frames = len(pred_onset)
     other = 1 - speaker
     pred = moving_average(pred_onset[:, speaker], ma)  # 表示・ピーク検出用に平滑化
+    if band_end is None:
+        band_end = onset_start
     w_start = max(0, ps_start - window_pad)
-    w_end = min(n_frames, onset_start + window_pad)
+    w_end = min(n_frames, max(onset_start, band_end) + window_pad)
     frames = np.arange(w_start, w_end)
     times = frames / FRAME_HZ
     ylo, yhi = -0.05, 1.12
@@ -81,19 +88,15 @@ def plot_shift(ax, pred_onset, gt_onset, va, speaker, sil_start, onset_start,
                     label="incoming speaker speech", zorder=0)
     ax.axhline(y=mid, color="#e2e8f0", lw=0.8, zorder=0)  # 上下半分の境界
 
-    # 沈黙区間（薄いオレンジ帯）
-    ax.axvspan(sil_start / FRAME_HZ, onset_start / FRAME_HZ,
-               alpha=0.22, color="orange", label="silence", zorder=0)
+    # 帯: 沈黙 [sil_start, onset) または オーバーラップ [onset, band_end)
+    ax.axvspan(sil_start / FRAME_HZ, band_end / FRAME_HZ,
+               alpha=band_alpha, color=band_color, label=band_label, zorder=0)
 
     # GT / Pred（次話者のみ）
     ax.plot(times, gt_onset[w_start:w_end, speaker], color="#08306b",
             lw=2.8, label="ground truth")
     ax.plot(times, pred[w_start:w_end], color="#b30000",
             lw=2.8, ls="--", label="predicted")
-
-    # 閾値（凡例に載せる）
-    ax.axhline(y=threshold, color="gray", ls=":", lw=1.8,
-               label=f"threshold ({threshold:.2f})")
 
     # true onset
     ax.axvline(x=onset_start / FRAME_HZ, color="black", lw=2.4,
@@ -110,14 +113,15 @@ def plot_shift(ax, pred_onset, gt_onset, va, speaker, sil_start, onset_start,
                 crossing_abs = ps_start + i
                 break
     error = None
-    if crossing_abs is not None:
+    if draw_marker and crossing_abs is not None:
         search_end = min(n_frames, onset_start + int(1.0 * FRAME_HZ))
         peak = find_peak_after(pred, crossing_abs, search_end)
         predicted_onset = peak + 1
         error = (predicted_onset - onset_start) / FRAME_HZ
+        lbl = (f"predicted onset (error {error:+.2f} s)" if show_error
+               else "predicted onset (peak)")
         ax.plot(peak / FRAME_HZ, pred[peak], "v",
-                color="#9467bd", markersize=15, zorder=6,
-                label=f"predicted onset (error {error:+.2f} s)")
+                color="#9467bd", markersize=15, zorder=6, label=lbl)
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Onset proximity")
@@ -137,6 +141,8 @@ def main():
     parser.add_argument("--output_dir", type=str, default="runs_evaluation/visualizations_simple")
     parser.add_argument("--num_samples", type=int, default=8)
     parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--event_type", type=str, default="shift",
+                        choices=["shift", "shift_ov"])
     parser.add_argument("--device", type=str, default="cpu")
     args = parser.parse_args()
 
@@ -151,10 +157,10 @@ def main():
     model = model.float()
 
     dset = VapDataset(
-        path="/Users/onishi/data/switchboard/vap-o_dataset/test.csv",
+        path=TEST_CSV,
         window_size=20.0,
         stride=20.0,
-        cpc_feature_dir="/Users/onishi/data/switchboard/vap-o_dataset/cpc_features",
+        cpc_feature_dir=CPC_DIR,
     )
     loader = DataLoader(dset, batch_size=4, num_workers=0, shuffle=False)
 
@@ -177,16 +183,18 @@ def main():
             )
             events = model.event_extractor(batch["va"])
             B = batch["va"].shape[0]
+            pk = "pred_" + args.event_type
+            ek = args.event_type
             for b in range(B):
                 if len(samples) >= args.num_samples:
                     break
-                if "pred_shift" not in events or "shift" not in events:
+                if pk not in events or ek not in events:
                     continue
-                for ps_start, ps_end, ps_speaker in events["pred_shift"][b]:
+                for ps_start, ps_end, ps_speaker in events[pk][b]:
                     if len(samples) >= args.num_samples:
                         break
                     best = None
-                    for sil_start, onset_start, sh_speaker in events["shift"][b]:
+                    for sil_start, onset_start, sh_speaker in events[ek][b]:
                         if sh_speaker != ps_speaker:
                             continue
                         dist = abs(ps_end - sil_start)
@@ -210,15 +218,26 @@ def main():
     print(f"Collected {len(samples)} samples")
     for i, s in enumerate(samples):
         fig, ax = plt.subplots(1, 1, figsize=(9.0, 5.0))
-        err = plot_shift(
-            ax,
-            pred_onset=s["pred_onset"], gt_onset=s["gt_onset"], va=s["va"],
-            speaker=s["speaker"], sil_start=s["sil_start"],
-            onset_start=s["onset_start"], ps_start=s["ps_start"],
-            ps_end=s["ps_end"], threshold=args.threshold,
-        )
+        if args.event_type == "shift_ov":
+            err = plot_shift(
+                ax,
+                pred_onset=s["pred_onset"], gt_onset=s["gt_onset"], va=s["va"],
+                speaker=s["speaker"], sil_start=s["sil_start"],
+                onset_start=s["sil_start"], ps_start=s["ps_start"],
+                ps_end=s["ps_end"], threshold=args.threshold,
+                band_end=s["onset_start"], band_label="overlap",
+                band_color="#b19cd9", draw_marker=False,
+            )
+        else:
+            err = plot_shift(
+                ax,
+                pred_onset=s["pred_onset"], gt_onset=s["gt_onset"], va=s["va"],
+                speaker=s["speaker"], sil_start=s["sil_start"],
+                onset_start=s["onset_start"], ps_start=s["ps_start"],
+                ps_end=s["ps_end"], threshold=args.threshold,
+            )
         fig.tight_layout()
-        fp = output_dir / f"shift_simple_{i:02d}_{s['session']}.png"
+        fp = output_dir / f"{args.event_type}_simple_{i:02d}_{s['session']}.png"
         fig.savefig(fp, dpi=160, bbox_inches="tight")
         plt.close(fig)
         es = f"{err:+.2f}s" if err is not None else "no-marker"
